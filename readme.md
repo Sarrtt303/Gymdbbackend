@@ -8,8 +8,8 @@ To get started with this project, you need to install its dependencies using Com
 
 1. **Clone the repository:**
    ```sh
-   git clone https://github.com/your-username/your-repository.git
-   cd your-repository
+   git clone https://github.com/This-is-Prateek/gymManagementSystem
+   cd gymManagementSystem
 
 2. **Install Composer dependencies**:  
    ```sh
