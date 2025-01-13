@@ -3,9 +3,9 @@ include_once __DIR__ . '/../utils/apiResponse.php';
 include_once __DIR__ . "/../utils/apiError.php";
 include_once __DIR__ . "/../models/user.model.php";
 include_once __DIR__ . "/../models/membership.model.php";
+
 class User
 {
-
     private $userSchema;
     private $membershipSchema;
 
@@ -13,195 +13,305 @@ class User
     {
         $this->userSchema = new UserSchema($db);
         $this->membershipSchema = new MembershipSchema($db);
-
         $this->initializeDatabase();
     }
 
-    //it will create all the necessary tables before processing the request
+    // It will create all the necessary tables before processing the request
     private function initializeDatabase()
     {
         $this->membershipSchema->createMembershipsTable();
         $this->userSchema->createUsersTable();
     }
 
-    public function handleRequest($request_method)
-    {
-        switch ($request_method) {
-            case 'GET':
-                $this->getUser();
-                break;
-
-            case 'POST':
-                $this->registerUser();
-                break;
-
-            case 'PATCH':
-                if (isset($_GET['user-details'])) {
-                    $this->updateUserDetails();
-                } elseif (isset($_GET['user-password'])) {
-                    $this->updateUserPassword();
-                } elseif (isset($_GET['update-role'])) {
-                    $this->updateUserRole();
-                } else if (isset($_GET["add-membership"])) {
-                    $this->addUserMembership();
-                }
-                break;
-
-            case 'DELETE':
-                $this->deleteUser();
-                break;
-
-            default:
-                header("HTTP/1.0 405 Method Not Allowed");
-                break;
-        }
-    }
-    private function registerUser()
+    public function registerUser()
     {
         try {
             $data = json_decode(file_get_contents("php://input"), true);
-            if (!empty($data['name']) && !empty($data['email']) && !empty($data['password']) && !empty($data['role']) && !empty($data['phone'])) {
+
+            if (!empty($data['name']) && !empty($data['username']) && !empty($data['email']) && !empty($data['password']) && !empty($data['phone']) && !empty($data['gender']) && !empty($data['dob']) && !empty($data['address'])) {
                 $createdUser = $this->userSchema->create($data);
                 if ($createdUser) {
-                    new apiResponse(201, "User registered successfully", $createdUser);
+                    new ApiResponse(201, "User registered successfully", $createdUser); // 201 Created
                 } else {
-                    throw new ApiError(500, "user registeration failed");
+                    throw new Exception("User registration failed", 500); // 500 Internal Server Error
                 }
             } else {
-                throw new apiError(404, "incomplete data provide");
+                throw new Exception("Incomplete data provided", 422); // 422 Unprocessable Entity
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(503, "Database error: " . $e->getMessage(),); // 503 Service Unavailable
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, $e->getMessage());
         }
     }
 
-    private function getUser()
+
+    public function login()
     {
         try {
-            if ($_GET["id"]) {
-                $id = $_GET["id"];
-                $user = $this->userSchema->read($id);
+            $data = json_decode(file_get_contents("php://input"), true);
+            if ((!empty($data["email"]) && !empty($data["password"])) || (!empty($data["username"]) && !empty($data["password"]))) {
+                //finds the user in db through either email or username(according to the user request)
+                $user = $this->userSchema->read($data["email"] ? "email" : "username", $data["email"] ?: $data["username"]);
+
                 if ($user) {
-                    new ApiResponse(200, "user fetched successfully", $user);
+                    $isPasswordValid = $this->userSchema->isPasswordCorrect($data["password"], $user["id"]);
+
+                    // Add logging to debug password verification
+                    error_log("User ID: " . $user["id"]);
+                    error_log("Entered Password: " . $data["password"]);
+                    error_log("Hashed Password: " . $user["password"]); // Ensure this is fetched correctly
+
+                    if ($isPasswordValid) {
+                        $accessToken = $this->userSchema->generateJwt($user, $_ENV["ACCESS_TOKEN_EXPIRY"], $_ENV["ACCESS_TOKEN_SECRET"]);
+                        $expiryTime = time() + intval($_ENV["ACCESS_TOKEN_EXPIRY"]);
+                        $options = [
+                            "expires" => $expiryTime,
+                            "path" => "/",
+                            "domain" => "",
+                            "secure" => true,
+                            "httponly" => true,
+                            "samesite" => "None"
+                        ];
+                        setcookie("access_token", $accessToken, $options);
+
+                        //removes sensitive information from the fetched data before sending it to user
+                        $loggedInUser = $this->userSchema->getUserByID($user["id"]);
+                        $fieldsToRemove = ["password", "access_token"];
+
+                        foreach ($fieldsToRemove as $field) {
+                            if (isset($loggedInUser[$field])) {
+                                unset($loggedInUser[$field]);
+                            }
+                        }
+
+                        new ApiResponse(200, "User logged in successfully", $loggedInUser);
+                    } else {
+                        throw new Exception("Incorrect password provided", 401);
+                    }
                 } else {
-                    throw new ApiError(404, "user not found");
+                    throw new Exception("User not found with provided email", 404);
                 }
             } else {
-                echo "user id is required";
+                throw new Exception("Incomplete data provided", 422); // Use 422 for unprocessable entity
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 
-    private function updateUserDetails()
+
+    public function logout($currentUser)
     {
         try {
-            $id = $_GET["id"];
-            if ($id) {
+            $result = $this->userSchema->updateField($currentUser["id"], "access_token", null);
+            if ($result) {
+                $expiryTime = time() - 10000;
+                $options = [
+                    "expires" => $expiryTime,
+                    "path" => "/",
+                    "domain" => "",
+                    "secure" => true,
+                    "httponly" => true,
+                    "samesite" => "None"
+                ];
+                setcookie("access_token", "", $options);
+                new ApiResponse(201, "user logged out successfully", true);
+            } else {
+                throw new Exception("there was an error logging out user", 401);
+            }
+        } catch (PDOException $th) {
+            new ApiError(500, "Database error: " . $th->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
+        }
+    }
+
+
+    public function getCurrentUser($currentUser)
+    {
+        try {
+            if ($currentUser) {
+                new ApiResponse(200, "User details fetched successfully", $currentUser); // 200 OK
+            } else {
+                throw new Exception("No logged in user found", 404); // 404 Not Found
+            }
+        } catch (PDOException $th) {
+            new ApiError(500, "Database error: " . $th->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
+        }
+    }
+
+    public function getUserByID($currentUser)
+    {
+        try {
+            if (isset($_GET["id"])) {
+                $id = $_GET["id"];
+                $user = $this->userSchema->read("id", $id);
+                if ($user) {
+                    $fieldsToRemove = ["password", "access_token"];
+
+                    foreach ($fieldsToRemove as $field) {
+                        if (isset($user[$field])) {
+                            unset($user[$field]);
+                        }
+                    }
+                    new ApiResponse(200, "User fetched successfully", $user); // 200 OK
+                } else {
+                    throw new Exception("User not found", 404); // 404 Not Found
+                }
+            } else {
+                throw new Exception("User ID is required", 400); // 400 Bad Request
+            }
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
+        }
+    }
+
+    public function updateUserDetails($currentUser)
+    {
+        try {
+            if (isset($_GET["id"])) {
+                $id = $_GET["id"];
                 $data = json_decode(file_get_contents("php://input"), true);
                 if ($data) {
                     $updatedUser = $this->userSchema->updateDetails($id, $data);
                     if ($updatedUser) {
-                        new apiResponse(200, "user details updated successfully", $updatedUser);
+                        $fieldsToRemove = ["password", "access_token"];
+
+                        foreach ($fieldsToRemove as $field) {
+                            if (isset($updatedUser[$field])) {
+                                unset($updatedUser[$field]);
+                            }
+                        }
+                        new ApiResponse(200, "User details updated successfully", $updatedUser); // 200 OK
                     } else {
-                        throw new ApiError(404, "user not found");
+                        throw new Exception("User not found", 404); // 404 Not Found
                     }
                 } else {
-                    echo "user data is required";
+                    throw new Exception("User data is required", 422); // 422 Unprocessable Entity
                 }
             } else {
-                echo "user id is required";
+                throw new Exception("User ID is required", 400); // 400 Bad Request
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 
-    private function deleteUser()
+    public function deleteUser($currentUser)
     {
         try {
-            $id = $_GET["id"];
-            if ($id) {
+            if (isset($_GET["id"])) {
+                $id = $_GET["id"];
                 $user = $this->userSchema->delete($id);
                 if ($user) {
-                    new apiResponse(200, "user deleted successfully", $user);
+                    new ApiResponse(200, "User deleted successfully", $user); // 200 OK
                 } else {
-                    throw new apiError(404, "user not found");
+                    throw new Exception("User not found", 404); // 404 Not Found
                 }
             } else {
-                throw new ApiError(404, "user id is required");
+                throw new Exception("User ID is required", 400); // 400 Bad Request
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 
-    private function updateUserPassword()
+    public function updateUserPassword($currentUser)
     {
         try {
-            $id = $_GET["id"];
-            if ($id) {
+            if (isset($_GET["id"])) {
+                $id = $_GET["id"];
                 $data = json_decode(file_get_contents("php://input"), true);
                 if ($data) {
-                    $user = $this->userSchema->updatePassword($id, $data);
-                    if ($user) {
-                        new apiResponse(200, "user password updated successfully", $user);
+                    $result = $this->userSchema->updatePassword($id, $data);
+                    if ($result) {
+                        new ApiResponse(200, "User password updated successfully", $result); // 200 OK
                     } else {
-                        throw new apiError(404, "user not found");
+                        throw new Exception("User not found", 404); // 404 Not Found
                     }
                 } else {
-                    throw new apiError(404, "user password is missing");
+                    throw new Exception("User password is missing", 422); // 422 Unprocessable Entity
                 }
             } else {
-                throw new apiError(404, "user id is required");
+                throw new Exception("User ID is required", 400); // 400 Bad Request
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 
-    private function updateUserRole()
+    public function updateUserRole($currentUser)
     {
         try {
-            $id = $_GET["id"];
-            if ($id) {
+            if (isset($_GET["id"])) {
+                $id = $_GET["id"];
                 $data = json_decode(file_get_contents("php://input"), true);
                 if ($data) {
-                    $user = $this->userSchema->updateRole($id, $data);
-                    if ($user) {
-                        new apiResponse(200, "user role updated successfully", $user);
+                    $updatedUser = $this->userSchema->updateRole($id, $data);
+                    if ($updatedUser) {
+                        $fieldsToRemove = ["password", "access_token"];
+
+                        foreach ($fieldsToRemove as $field) {
+                            if (isset($updatedUser[$field])) {
+                                unset($updatedUser[$field]);
+                            }
+                        }
+                        new ApiResponse(200, "User role updated successfully", $updatedUser); // 200 OK
                     } else {
-                        throw new apiError(404, "user not found");
+                        throw new Exception("User not found", 404); // 404 Not Found
                     }
                 } else {
-                    throw new apiError(404, "user data is required");
+                    throw new Exception("User data is required", 422); // 422 Unprocessable Entity
                 }
             } else {
-                throw new apiError(404, "user id is required");
+                throw new Exception("User ID is required", 400); // 400 Bad Request
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 
-    private function addUserMembership()
+    public function addUserMembership($currentUser)
     {
         try {
-            $id = $_GET["id"];
-            $membership_id = $_GET["mid"];
-            if ($id && $membership_id) {
-                $result = $this->userSchema->addMembership($id, $membership_id);
-                if ($result) {
-                    new apiResponse(200, "membership added successfully", $result);
+            if (isset($_GET["id"]) && isset($_GET["mid"])) {
+                $id = $_GET["id"];
+                $membership_id = $_GET["mid"];
+                $updatedUser = $this->userSchema->addMembership($id, $membership_id);
+                if ($updatedUser) {
+                    $fieldsToRemove = ["password", "access_token"];
+
+                    foreach ($fieldsToRemove as $field) {
+                        if (isset($updatedUser[$field])) {
+                            unset($updatedUser[$field]);
+                        }
+                    }
+                    new ApiResponse(200, "Membership added successfully", $updatedUser); // 200 OK
                 } else {
-                    new apiError(404, "user or membership not found");
+                    throw new Exception("User or membership not found", 404); // 404 Not Found
                 }
             } else {
-                throw new apiError(404, "user id and membership id is required");
+                throw new Exception("User ID and membership ID are required", 400); // 400 Bad Request
             }
-        } catch (PDOException $th) {
-            echo $th->getMessage();
+        } catch (PDOException $e) {
+            new ApiError(500, "Database error: " . $e->getMessage());
+        } catch (Exception $e) {
+            new ApiError($e->getCode() ?: 500, "Error: " . $e->getMessage());
         }
     }
 }

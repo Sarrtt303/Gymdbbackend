@@ -1,0 +1,19 @@
+{
+    "name": "cct/gms",
+    "description": "This is a gym management system, that'd make the gym related tasks more easier for all users.",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Cct\\Gms\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Prateek"
+        }
+    ],
+    "require": {
+        "firebase/php-jwt": "^6.10",
+        "vlucas/phpdotenv": "^5.6"
+    }
+}

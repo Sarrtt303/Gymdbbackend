@@ -1,27 +1,33 @@
 <?php
 //headers that will be sent to the client with the response
 header("Content-Type: application/json; charset=UTF-8");  //response will be in json
-header("Access-Control-Allow-Origin: *"); //allow everyone to access these apis
+header("Access-Control-Allow-Origin: https://crisscrosstamizh.in"); //change the url to the locally hosted page url that is sending the request
 header("Access-Control-Allow-Headers: Content-Type, Authorization"); //requests with mentioned header are allowed
-header("Acess-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS"); //mentioned http requests are allowed
+header("Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS"); //mentioned http requests are allowed
+header("Access-Control-Allow-Credentials: true"); //allows cross origin requests to send cookies to the server
 
 include_once __DIR__ . "/config/database.php";
+include_once __DIR__ . "/../vendor/autoload.php";
+
+use Dotenv\Dotenv;
+
+$dotenv = Dotenv::createImmutable(__DIR__ . "/../");
+$dotenv->load();
 
 
 $db = new Database;  //database instance
 $conn = $db->getConnection(); //databse connection instance
 
 $request_method = $_SERVER['REQUEST_METHOD'];
-$request_uri = explode("?", $_SERVER["REQUEST_URI"], 2); //converts the request uri into an array with two elements 
-$path = trim(str_replace('gymManagementSystem/api/v1', '', $request_uri[0]), '/');  //first element, which is the path of the uri
-$query_string = $request_uri[1] ?? ""; //second element, the query string
+$url = parse_url($_SERVER["REQUEST_URI"]);
+$path = trim(str_replace('gymManagementSystem/api/v1', '', $url["path"]), '/');
 
 //route handler, distributes requests to appropriate controller according to the path of the uri
 switch ($path) {
     case 'users':
-        include_once __DIR__ . '/controllers/user.controller.php';
-        $user = new User($conn);
-        $user->handleRequest($request_method);
+        include_once __DIR__ . "/routers/user.router.php";
+        $user = new User_router($conn);
+        $user->handleRequest();
         break;
 
     case 'memberships':
