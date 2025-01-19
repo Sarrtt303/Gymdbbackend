@@ -18,7 +18,7 @@ class TrainerSchema
 
             if (!$result) {
                 $query = "
-                CREATE TABLE IF NOT EXISTS trainer (
+                CREATE TABLE IF NOT EXISTS trainers (
                     id int AUTO_INCREMENT NOT NULL,
                     uid int NOT NULL,
                     name VARCHAR(100) NOT NULL,

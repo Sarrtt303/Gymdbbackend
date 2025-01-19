@@ -32,6 +32,11 @@ class UserSchema
                     gender ENUM('male', 'female', 'others') NOT NULL,
                     dob DATE NOT NULL,
                     address VARCHAR(100) NOT NULL,
+                    workout_routine_id int,
+                    classes_Joined_id int,
+                    goal_id int,
+                    diet_id int,
+                    trainer_id int,
                     membership_id int, 
                     membership_start_date DATE,
                     membership_end_date DATE,
@@ -39,7 +44,12 @@ class UserSchema
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (id),
-                    FOREIGN KEY (membership_id) REFERENCES memberships(id) ON DELETE CASCADE
+                    FOREIGN KEY (membership_id) REFERENCES memberships(id) ON DELETE CASCADE,
+                    FOREIGN KEY (workout_routine_id) REFERENCES workouts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (classes_Joined_id) REFERENCES classes_joined(id) ON DELETE CASCADE,
+                    FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+                    FOREIGN KEY (diet_id) REFERENCES diets(id) ON DELETE CASCADE,
+                    FOREIGN KEY (trainer_id) REFERENCES trainers(id) ON DELETE CASCADE,
                 )";
 
                 if ($this->db->exec($query)) {
