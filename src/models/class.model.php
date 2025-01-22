@@ -2,7 +2,6 @@
 
 class ClassSchema
 {
-
     private $db;
 
     public function __construct($db)
@@ -33,10 +32,118 @@ class ClassSchema
                     echo "Classes table created successfully";
                 }
             }
-        } catch (\Throwable $th) {
-            echo $th->getMessage();
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
-    //write functions here..
+    public function createClass($data)
+    {
+        ['name' => $name, 'description' => $description, 'trainer_id' => $trainer_id, 'schedule' => $schedule] = $data;
+
+        try {
+            $query = "INSERT INTO classes (name, description, trainer_id, schedule)
+                      VALUES (:name, :description, :trainer_id, :schedule)";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(":name", $name);
+            $stmt->bindParam(":description", $description);
+            $stmt->bindParam(":trainer_id", $trainer_id);
+            $stmt->bindParam(":schedule", $schedule);
+
+            $stmt->execute();
+            return $this->getClassById($this->db->lastInsertId());
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    public function getClassById($id)
+    {
+        try {
+            $query = "SELECT * FROM classes WHERE id = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(":id", $id);
+            $stmt->execute();
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    public function getAllClassesByTrainerId($trainer_id)
+    {
+        try {
+            $query = "SELECT * FROM classes WHERE trainer_id = :trainer_id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(":trainer_id", $trainer_id);
+            $stmt->execute();
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+
+    public function updateClass($id, $data)
+    {
+        try {
+            $query = "UPDATE classes SET 
+                      name = :name,
+                      description = :description,
+                      trainer_id = :trainer_id,
+                      schedule = :schedule
+                      WHERE id = :id";
+
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(":name", $data['name']);
+            $stmt->bindParam(":description", $data['description']);
+            $stmt->bindParam(":trainer_id", $data['trainer_id']);
+            $stmt->bindParam(":schedule", $data['schedule']);
+            $stmt->bindParam(":id", $id);
+
+            $stmt->execute();
+            return $this->getClassById($id);
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    public function deleteClass($id)
+    {
+        try {
+            $query = "DELETE FROM classes WHERE id = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(":id", $id);
+            $stmt->execute();
+            return true;
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    public function getAllClasses()
+    {
+        try {
+            $query = "SELECT * FROM classes";
+            $stmt = $this->db->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $th) {
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
+        }
+    }
 }

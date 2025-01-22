@@ -32,7 +32,9 @@ class MembershipSchema
                 }
             }
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
@@ -41,7 +43,7 @@ class MembershipSchema
         try {
             if ($data) {
                 $query = "INSERT INTO memberships (name, price, duration, description)
-                VALUES (:name, :price, :duration, :description)";
+                      VALUES (:name, :price, :duration, :description)";
                 $stmt = $this->db->prepare($query);
                 $stmt->bindParam(":name", $data["name"]);
                 $stmt->bindParam(":price", $data["price"]);
@@ -51,7 +53,9 @@ class MembershipSchema
                 return $stmt->execute();
             }
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
@@ -67,7 +71,9 @@ class MembershipSchema
                 return $result;
             }
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
@@ -80,7 +86,9 @@ class MembershipSchema
             $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return $result;
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
@@ -88,7 +96,7 @@ class MembershipSchema
     {
         try {
             if ($id) {
-                $query = "UPDATE memberships SET name= :name, price = :price, duration=:duration,description=:description WHERE id = :id";
+                $query = "UPDATE memberships SET name = :name, price = :price, duration = :duration, description = :description WHERE id = :id";
                 $stmt = $this->db->prepare($query);
                 $stmt->bindParam(":name", $data["name"]);
                 $stmt->bindParam(":price", $data["price"]);
@@ -99,7 +107,9 @@ class MembershipSchema
                 return $stmt->execute();
             }
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 
@@ -113,7 +123,9 @@ class MembershipSchema
                 return $stmt->execute();
             }
         } catch (PDOException $th) {
-            echo $th->getMessage();
+            throw new Exception("Database error: " . $th->getMessage(), 500);
+        } catch (Exception $e) {
+            throw new Exception("Error: " . $e->getMessage(), 500);
         }
     }
 }
