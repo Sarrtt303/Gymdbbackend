@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . "/../utils/apiError.php";
 
 class Database //database configuration and connection
 {

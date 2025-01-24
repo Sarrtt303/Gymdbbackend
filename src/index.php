@@ -1,7 +1,7 @@
 <?php
 //headers that will be sent to the client with the response
 header("Content-Type: application/json; charset=UTF-8");  //response will be in json
-header("Access-Control-Allow-Origin: https://crisscrosstamizh.in"); //change the url to the locally hosted page url that is sending the request
+header("Access-Control-Allow-Origin: *"); //change the url to the locally hosted page url that is sending the request
 header("Access-Control-Allow-Headers: Content-Type, Authorization"); //requests with mentioned header are allowed
 header("Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS"); //mentioned http requests are allowed
 header("Access-Control-Allow-Credentials: true"); //allows cross origin requests to send cookies to the server
@@ -55,9 +55,15 @@ switch ($path) {
         break;
 
     case 'attendence':
-        include_once __DIR__ . '/controllers/attendence.controller.php';
+        include_once __DIR__ . '/router/attendence.controller.php';
+        $user = new User_router($conn);
+        $user->handleRequest();
         break;
-
+    case 'dashboard':
+        include_once __DIR__ . '/routers/dashboard.router.php';
+        $dashboard = new DashboardRouter($conn);
+        $dashboard->handleRequest();
+        break;
     default:
         header("HTTP/1.0 405 Method Not Allowed");
         break;
