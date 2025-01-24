@@ -1,61 +1,39 @@
 <?php
-include_once __DIR__ . "/../models/booking.model.php";
-include_once __DIR__ . "/../models/class.model.php";
-include_once __DIR__ . "/../models/user.model.php";
-include_once __DIR__ . "/../models/trainer.model.php";
-include_once __DIR__ . "/../models/membership.model.php";
-include_once __DIR__ . "/../utils/apiResponse.php";
-include_once __DIR__ . "/../utils/apiError.php";
+include_once __DIR__ . '/../models/booking.model.php';
 
-class Booking
-{
+class BookingController {
+    private $model;
 
-    private $bookingSchema;
-    private $classSchema;
-    private $trainerSchema;
-    private $userSchema;
-    private $membershipSchema;
-
-    public function __construct($db)
-    {
-        $this->bookingSchema = new BookingSchema($db);
-        $this->classSchema = new ClassSchema($db);
-        $this->trainerSchema = new TrainerSchema($db);
-        $this->userSchema = new UserSchema($db);
-        $this->membershipSchema = new MembershipSchema($db);
-        $this->initializeDatabase();
+    public function __construct($db) {
+        $this->model = new BookingModel($db);
     }
 
-    private function initializeDatabase()
-    {
-        $this->membershipSchema->createMembershipsTable();
-        $this->userSchema->createUsersTable();
-        $this->trainerSchema->createTrainersTable();
-        $this->classSchema->createClassesTable();
-        $this->bookingSchema->createBookingsTable();
-    }
+    // Create a session
+    public function createSession() {
+        // Get input data from the request
+        $data = json_decode(file_get_contents("php://input"), true);
 
-    public function handleRequest($request_method)
-    {
-        switch ($request_method) {
-            case 'GET':
-                # code...
-                break;
+        // Validate input
+        if (!isset($data['trainer_name']) || !isset($data['session_date']) || !isset($data['session_time'])) {
+            new ApiError(400, "Missing required fields: trainer_name, session_date, and session_time");
+            return;
+        }
 
-            case 'POST':
-                break;
+        $trainerName = $data['trainer_name'];
+        $sessionDate = $data['session_date'];
+        $sessionTime = $data['session_time'];
 
-            case 'PATCH':
-                break;
-
-            case 'DELETE':
-                break;
-
-            default:
-                # code...
-                break;
+        // Call the model to insert the session
+        try {
+            $sessionId = $this->model->insertSession($trainerName, $sessionDate, $sessionTime);
+            echo json_encode([
+                "success" => true,
+                "message" => "Session created successfully",
+                "session_id" => $sessionId
+            ]);
+        } catch (Exception $e) {
+            new ApiError(500, "Failed to create session: " . $e->getMessage());
         }
     }
-
-    //write functions here..
 }
+?>

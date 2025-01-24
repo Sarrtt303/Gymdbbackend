@@ -46,8 +46,10 @@ switch ($path) {
         include_once __DIR__ . '/controllers/class.controller.php';
         break;
 
-    case 'bookings':
-        include_once __DIR__ . '/controllers/booking.controller.php';
+    case 'booking':
+        include_once __DIR__ . '/routers/booking.router.php';
+        $bookingRouter = new BookingRouter($conn);
+        $bookingRouter->handleRequest();
         break;
 
     case 'payments':
