@@ -24,6 +24,7 @@ class addedWorkoutSchema
                     id int AUTO_INCREMENT NOT NULL,
                     user_id int,
                     workout_id int,
+                    PRIMARY KEY(id),
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
                 )";
